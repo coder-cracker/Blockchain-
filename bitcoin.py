@@ -76,7 +76,7 @@ class Blockchain:
         longest_chain = None 
         max_length = len(self.chain)
         for nodes in network:
-            response = requests.get(f'http://{nodes}}/get_chain')
+            response = requests.get(f'http://{nodes}/get_chain')
             if response.status_code == 200:
                 length = response.json()['length']
                 chain = response.json()['chain']
@@ -125,7 +125,19 @@ def get_chain():
                 'length': len(blockchain.chain)}
     return jsonify(response),200
 
-@app.route('\add_transaction', methods = ['POST'])
+#checking if Blockchain is valid
+@app.route('/is_valid', methods = ['GET'])
+def is_valid():
+    is_valid = blockchain.is_chain_valid(blockchain.chain)
+    if is_valid:
+        response = {'message': 'All good. The Blockchain is valid.'}
+    else:
+        response = {'message': 'Houston, we have a problem. The Blockchain is not valid.'}
+    return jsonify(response), 200
+
+#Adding a new transaction to the Blockchain 
+
+@app.route('/add_transaction', methods = ['POST'])
 def add_transaction():
     json = request.get_json()
     transaction_keys = ['sender','receiver','amount']
@@ -134,5 +146,33 @@ def add_transaction():
     index = blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
     response = {'message': f'This transactions will be added to block {index}'}
     return jsonify(response),201
+
+#Part 3- Decentralizing our Blockchain
+
+# Connecting new nodes
+
+@app.route('/connect_node', methods = ['POST'])
+def connect_node():
+    json = request.get_json()
+    nodes = json.gets('nodes')
+    if nodes is None:
+        return "No Node", 400 
+    for node in nodes:
+        blockchain.add_node(node)
+    response = {'message': 'All the nodes are now connected. The Hadcoin Blockchain now contains the following node :',
+                'total_nodes': list(blockchain.nodes)}
+    return jsonify(response), 201
+
+# Replacing the chain by the longest chain if needed
+@app.route('/replace_chain', methods = ['GET'])
+def replace_chain():
+    is_chain_replaced = blockchain.replace_chain()
+    if is_chain_replaced:
+        response = {'message': 'The nodes had different chain so the chain was replaced by longest chain.',
+                    'new_chain': blockchain.chain}
+    else:
+        response = {'message': 'All good. The chain is the largest one.',
+                    'actual_chain': blockchain.chain}
+    return jsonify(response), 200 
 
 app.run(host ='0.0.0.0',port = 5000)
